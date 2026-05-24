@@ -1,50 +1,22 @@
-import { useState } from "react";
-import axios from "axios";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import Signup from "./pages/Signup";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
-  const [audio, setAudio] = useState(null);
-
-  const handleUpload = async () => {
-    if (!audio) {
-      alert("Please select an audio file");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("audio", audio);
-
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/api/upload",
-        formData
-      );
-
-      alert("File uploaded successfully");
-      console.log(res.data);
-    } catch (error) {
-      console.log(error);
-      alert("Upload failed");
-    }
-  };
-
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-black text-white gap-5">
-      <h1 className="text-4xl font-bold">Speech To Text App</h1>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/signup" />} />
 
-      <input
-        type="file"
-        accept="audio/*"
-        onChange={(e) => setAudio(e.target.files[0])}
-        className="border p-2 rounded"
-      />
+        <Route path="/signup" element={<Signup />} />
 
-      <button
-        onClick={handleUpload}
-        className="bg-blue-500 px-6 py-2 rounded hover:bg-blue-600"
-      >
-        Upload Audio
-      </button>
-    </div>
+        <Route path="/login" element={<Login />} />
+
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
