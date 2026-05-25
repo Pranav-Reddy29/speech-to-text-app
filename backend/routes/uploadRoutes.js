@@ -35,8 +35,8 @@ const upload = multer({
 
 router.post("/", upload.single("audio"), (req, res) => {
   res.status(200).json({
-    message: "File uploaded successfully",
-    file: req.file,
+  message: "File uploaded successfully",
+  audioPath: req.file.path,
   });
 });
 

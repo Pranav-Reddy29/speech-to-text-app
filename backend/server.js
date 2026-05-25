@@ -6,6 +6,7 @@ const connectDB = require("./config/db");
 
 const uploadRoutes = require("./routes/uploadRoutes");
 const authRoutes = require("./routes/authRoutes");
+const transcriptionRoutes = require("./routes/transcriptionRoutes");
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 app.use("/api/upload", uploadRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/transcribe", transcriptionRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend Running Successfully");
