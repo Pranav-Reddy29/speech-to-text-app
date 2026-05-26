@@ -1,0 +1,33 @@
+const mongoose = require("mongoose");
+
+const transcriptionSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    filename: {
+      type: String,
+      required: true,
+    },
+
+    audioPath: {
+      type: String,
+      required: true,
+    },
+
+    transcription: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model(
+  "Transcription",
+  transcriptionSchema
+);
