@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
 import axios from "axios";
+
+import toast from "react-hot-toast";
 
 function Dashboard() {
   const [audio, setAudio] = useState(null);
@@ -10,6 +17,12 @@ function Dashboard() {
   const [history, setHistory] = useState([]);
 
   const [loading, setLoading] = useState(false);
+
+  const [recording, setRecording] =
+    useState(false);
+
+  const [mediaRecorder, setMediaRecorder] =
+    useState(null);
 
   const token = localStorage.getItem("token");
 
@@ -31,32 +44,74 @@ function Dashboard() {
     }
   }, [token]);
 
-  // LOAD HISTORY ON PAGE LOAD
+  // LOAD HISTORY
   useEffect(() => {
     const loadHistory = async () => {
-      try {
-        const res = await axios.get(
-          "http://localhost:5000/api/transcribe",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        setHistory(res.data);
-      } catch (error) {
-        console.log(error);
-      }
+      await fetchHistory();
     };
 
     loadHistory();
-  }, [token]);
+  }, [fetchHistory]);
 
-  // HANDLE AUDIO UPLOAD
+  // START RECORDING
+  const startRecording = async () => {
+    try {
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+      const recorder = new MediaRecorder(stream);
+
+      let audioChunks = [];
+
+      recorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, {
+          type: "audio/mp4",
+        });
+
+        const audioFile = new File(
+          [audioBlob],
+          "recording.mp4",
+          {
+            type: "audio/mp4",
+          }
+        );
+
+        setAudio(audioFile);
+
+        toast.success("Recording completed");
+      };
+
+      recorder.start();
+
+      setMediaRecorder(recorder);
+
+      setRecording(true);
+
+      toast.success("Recording started");
+    } catch (error) {
+      console.log(error);
+
+      toast.error("Microphone access denied");
+    }
+  };
+
+  // STOP RECORDING
+  const stopRecording = () => {
+    mediaRecorder.stop();
+
+    setRecording(false);
+  };
+
+  // HANDLE UPLOAD
   const handleUpload = async () => {
     if (!audio) {
-      alert("Please select audio");
+      toast.error("Please select audio");
 
       return;
     }
@@ -68,13 +123,13 @@ function Dashboard() {
 
       formData.append("audio", audio);
 
-      // STEP 1: Upload Audio
+      // UPLOAD AUDIO
       const uploadRes = await axios.post(
         "http://localhost:5000/api/upload",
         formData
       );
 
-      // STEP 2: Transcribe Audio
+      // TRANSCRIBE AUDIO
       const transcribeRes = await axios.post(
         "http://localhost:5000/api/transcribe",
         {
@@ -91,8 +146,13 @@ function Dashboard() {
         transcribeRes.data.transcription
       );
 
-      // REFRESH HISTORY
+      toast.success(
+        "Transcription completed"
+      );
+
       fetchHistory();
+
+      setAudio(null);
 
       setLoading(false);
     } catch (error) {
@@ -100,12 +160,26 @@ function Dashboard() {
 
       setLoading(false);
 
-      alert("Transcription failed");
+      toast.error("Transcription failed");
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white p-6">
+      {/* LOGOUT */}
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+
+            window.location.href = "/login";
+          }}
+          className="bg-red-500 px-5 py-2 rounded hover:bg-red-600 transition"
+        >
+          Logout
+        </button>
+      </div>
+
       {/* TITLE */}
       <h1 className="text-5xl font-bold text-center mb-10">
         AI Speech To Text
@@ -113,31 +187,65 @@ function Dashboard() {
 
       {/* UPLOAD SECTION */}
       <div className="flex flex-col items-center gap-6">
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) =>
-            setAudio(e.target.files[0])
-          }
-          className="border p-3 rounded"
-        />
+        {/* FILE INPUT */}
+        <label className="border-2 border-dashed border-gray-500 p-10 rounded-xl cursor-pointer hover:border-blue-500 transition text-center w-full max-w-xl">
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={(e) =>
+              setAudio(e.target.files[0])
+            }
+            className="hidden"
+          />
 
+          <p className="text-xl">
+            Click To Upload Audio
+          </p>
+
+          {audio && (
+            <p className="text-gray-400 mt-4">
+              Selected: {audio.name}
+            </p>
+          )}
+        </label>
+
+        {/* RECORDING BUTTONS */}
+        <div className="flex gap-4">
+          {!recording ? (
+            <button
+              onClick={startRecording}
+              className="bg-green-500 px-6 py-3 rounded hover:bg-green-600 transition"
+            >
+              Start Recording
+            </button>
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="bg-red-500 px-6 py-3 rounded hover:bg-red-600 transition"
+            >
+              Stop Recording
+            </button>
+          )}
+        </div>
+
+        {/* TRANSCRIBE BUTTON */}
         <button
           onClick={handleUpload}
-          className="bg-blue-500 px-6 py-3 rounded hover:bg-blue-600 transition"
+          className="bg-blue-500 px-8 py-3 rounded-xl hover:bg-blue-600 transition text-lg font-semibold"
         >
           Upload & Transcribe
         </button>
 
+        {/* LOADING */}
         {loading && (
-          <p className="text-yellow-400 text-xl">
+          <p className="text-yellow-400 text-xl animate-pulse">
             Transcribing Audio...
           </p>
         )}
 
         {/* LATEST TRANSCRIPTION */}
         {transcription && (
-          <div className="bg-gray-900 p-6 rounded-lg w-full max-w-3xl">
+          <div className="bg-gray-900/80 p-6 rounded-2xl shadow-xl w-full max-w-3xl">
             <h2 className="text-2xl font-bold mb-4">
               Latest Transcription
             </h2>
@@ -149,24 +257,23 @@ function Dashboard() {
         )}
       </div>
 
-      {/* HISTORY SECTION */}
+      {/* HISTORY */}
       <div className="mt-16">
         <h2 className="text-4xl font-bold mb-8">
           History
         </h2>
 
-        <div className="grid gap-6">
+        <div className="grid md:grid-cols-2 gap-6">
           {history.length > 0 ? (
             history.map((item) => (
               <div
                 key={item._id}
-                className="bg-gray-900 p-6 rounded-lg shadow-lg"
+                className="bg-gray-900/80 p-6 rounded-2xl shadow-xl hover:scale-[1.02] transition duration-300"
               >
                 <h3 className="text-xl font-bold mb-3">
                   {item.filename}
                 </h3>
 
-                {/* AUDIO PLAYER */}
                 <audio
                   controls
                   className="w-full mb-4"
@@ -176,12 +283,10 @@ function Dashboard() {
                   />
                 </audio>
 
-                {/* TRANSCRIPTION */}
                 <p className="text-gray-300 leading-7">
                   {item.transcription}
                 </p>
 
-                {/* DATE */}
                 <p className="text-sm text-gray-500 mt-4">
                   {new Date(
                     item.createdAt
@@ -190,9 +295,11 @@ function Dashboard() {
               </div>
             ))
           ) : (
-            <p className="text-gray-400 text-lg">
-              No transcription history found.
-            </p>
+            <div className="bg-gray-900 p-8 rounded-lg text-center">
+              <p className="text-gray-400 text-xl">
+                No transcription history yet 🎙️
+              </p>
+            </div>
           )}
         </div>
       </div>
