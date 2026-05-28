@@ -73,4 +73,39 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
+
+// DELETE TRANSCRIPTION
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const transcription =
+      await Transcription.findById(req.params.id);
+
+    if (!transcription) {
+      return res.status(404).json({
+        message: "Transcription not found",
+      });
+    }
+
+    // CHECK USER OWNERSHIP
+    if (
+      transcription.user.toString() !== req.user
+    ) {
+      return res.status(401).json({
+        message: "Not authorized",
+      });
+    }
+
+    await transcription.deleteOne();
+
+    res.status(200).json({
+      message: "Transcription deleted",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+});
+
+
 module.exports = router;
