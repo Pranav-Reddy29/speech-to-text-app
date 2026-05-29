@@ -43,7 +43,7 @@ function Dashboard() {
   const fetchHistory = useCallback(async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/transcribe",
+  `${import.meta.env.VITE_API_URL}/api/transcribe`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -179,7 +179,7 @@ function Dashboard() {
   const handleDelete = async (id) => {
     try {
       await axios.delete(
-        `http://localhost:5000/api/transcribe/${id}`,
+  `${import.meta.env.VITE_API_URL}/api/transcribe/${id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
