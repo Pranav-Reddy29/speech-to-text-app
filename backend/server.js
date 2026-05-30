@@ -39,17 +39,21 @@ io.on("connection", (socket) => {
   let deepgramConnection;
 
   socket.on(
-  "audio-stream",
-  async (audioChunk) => {
+    "audio-stream",
+    async (audioChunk) => {
 
-    console.log(
-      "Audio chunk received:",
-      audioChunk.byteLength
-    );
+      console.log(
+        "Audio chunk received:",
+        audioChunk.byteLength
+      );
 
-    try {
+      try {
 
         if (!deepgramConnection) {
+
+          console.log(
+            "Creating Deepgram Connection..."
+          );
 
           deepgramConnection =
             deepgram.listen.live({
@@ -59,35 +63,68 @@ io.on("connection", (socket) => {
             });
 
           deepgramConnection.on(
-  "transcript",
-  (data) => {
+            "open",
+            () => {
+              console.log(
+                "Deepgram Connected"
+              );
+            }
+          );
 
-    console.log(
-      "Deepgram Response:",
-      JSON.stringify(data, null, 2)
-    );
+          deepgramConnection.on(
+            "close",
+            () => {
+              console.log(
+                "Deepgram Closed"
+              );
+            }
+          );
 
-    const transcript =
-      data.channel?.alternatives?.[0]
-        ?.transcript;
+          deepgramConnection.on(
+            "error",
+            (err) => {
+              console.log(
+                "Deepgram Error:",
+                err
+              );
+            }
+          );
 
-    if (
-      transcript &&
-      transcript.length > 0
-    ) {
+          deepgramConnection.on(
+            "transcript",
+            (data) => {
 
-      console.log(
-        "Transcript:",
-        transcript
-      );
+              console.log(
+                "Deepgram Response:",
+                JSON.stringify(
+                  data,
+                  null,
+                  2
+                )
+              );
 
-      socket.emit(
-        "transcript",
-        transcript
-      );
-    }
-  }
-);
+              const transcript =
+                data.channel
+                  ?.alternatives?.[0]
+                  ?.transcript;
+
+              if (
+                transcript &&
+                transcript.length > 0
+              ) {
+
+                console.log(
+                  "Transcript:",
+                  transcript
+                );
+
+                socket.emit(
+                  "transcript",
+                  transcript
+                );
+              }
+            }
+          );
         }
 
         deepgramConnection.send(
@@ -95,7 +132,10 @@ io.on("connection", (socket) => {
         );
 
       } catch (error) {
-        console.log(error);
+        console.log(
+          "Deepgram Exception:",
+          error
+        );
       }
     }
   );
