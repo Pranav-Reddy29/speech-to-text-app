@@ -26,11 +26,89 @@ const io = new Server(server, {
 });
 
 // SOCKET EVENTS
+const { createClient } =
+  require("@deepgram/sdk");
+
+const deepgram = createClient(
+  process.env.DEEPGRAM_API_KEY
+);
+
 io.on("connection", (socket) => {
   console.log("Client Connected");
 
+  let deepgramConnection;
+
+  socket.on(
+  "audio-stream",
+  async (audioChunk) => {
+
+    console.log(
+      "Audio chunk received:",
+      audioChunk.byteLength
+    );
+
+    try {
+
+        if (!deepgramConnection) {
+
+          deepgramConnection =
+            deepgram.listen.live({
+              model: "nova-2",
+              language: "en",
+              smart_format: true,
+            });
+
+          deepgramConnection.on(
+  "transcript",
+  (data) => {
+
+    console.log(
+      "Deepgram Response:",
+      JSON.stringify(data, null, 2)
+    );
+
+    const transcript =
+      data.channel?.alternatives?.[0]
+        ?.transcript;
+
+    if (
+      transcript &&
+      transcript.length > 0
+    ) {
+
+      console.log(
+        "Transcript:",
+        transcript
+      );
+
+      socket.emit(
+        "transcript",
+        transcript
+      );
+    }
+  }
+);
+        }
+
+        deepgramConnection.send(
+          Buffer.from(audioChunk)
+        );
+
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  );
+
   socket.on("disconnect", () => {
-    console.log("Client Disconnected");
+
+    if (deepgramConnection) {
+      deepgramConnection.finish();
+    }
+
+    console.log(
+      "Client Disconnected"
+    );
   });
 });
 

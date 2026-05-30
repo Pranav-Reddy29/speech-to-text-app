@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import socket from "../socket";
@@ -30,13 +31,15 @@ function Dashboard() {
 
   const [loading, setLoading] = useState(false);
 
-  const [recording, setRecording] =
-    useState(false);
-
-  const [mediaRecorder, setMediaRecorder] =
-    useState(null);
-
   const [search, setSearch] = useState("");
+
+  const [liveTranscript, setLiveTranscript] =
+  useState("");
+
+const [isLiveRecording, setIsLiveRecording] =
+  useState(false);
+
+const mediaRecorderRef = useRef(null);
 
   const token = localStorage.getItem("token");
 
@@ -65,8 +68,19 @@ function Dashboard() {
     );
   });
 
+  socket.on(
+    "transcript",
+    (transcript) => {
+      setLiveTranscript(
+        (prev) =>
+          prev + " " + transcript
+      );
+    }
+  );
+
   return () => {
     socket.off("connect");
+    socket.off("transcript");
   };
 }, []);
 
@@ -79,58 +93,56 @@ function Dashboard() {
     return () => clearTimeout(id);
   }, [fetchHistory]);
 
-  // START RECORDING
-  const startRecording = async () => {
-    try {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
+const startLiveRecording = async () => {
+  try {
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
 
-      const recorder = new MediaRecorder(stream);
+    const recorder = new MediaRecorder(stream);
 
-      let audioChunks = [];
+    mediaRecorderRef.current = recorder;
 
-      recorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
-      };
+    recorder.ondataavailable = async (
+      event
+    ) => {
+      if (event.data.size > 0) {
+        const arrayBuffer =
+          await event.data.arrayBuffer();
 
-      recorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, {
-          type: "audio/mp4",
-        });
-
-        const audioFile = new File(
-          [audioBlob],
-          "recording.mp4",
-          {
-            type: "audio/mp4",
-          }
+        socket.emit(
+          "audio-stream",
+          arrayBuffer
         );
+      }
+    };
 
-        setAudio(audioFile);
+    recorder.start(250);
 
-        toast.success("Recording completed");
-      };
+    setLiveTranscript("");
 
-      recorder.start();
+    setIsLiveRecording(true);
 
-      setMediaRecorder(recorder);
+    toast.success("Recording started");
+  } catch (error) {
+    console.log(error);
 
-      setRecording(true);
+    toast.error(
+      "Microphone access denied"
+    );
+  }
+};
 
-      toast.success("Recording started");
-    } catch {
-      toast.error("Microphone access denied");
-    }
-  };
+const stopLiveRecording = () => {
+  if (mediaRecorderRef.current) {
+    mediaRecorderRef.current.stop();
+  }
 
-  // STOP RECORDING
-  const stopRecording = () => {
-    mediaRecorder.stop();
+  setIsLiveRecording(false);
 
-    setRecording(false);
-  };
+  toast.success("Recording stopped");
+};
 
   // HANDLE UPLOAD
   const handleUpload = async () => {
@@ -343,26 +355,43 @@ const handleLogout = () => {
   )}
 </label>
 
-        {/* RECORDING */}
-        <div className="flex gap-4">
-          {!recording ? (
-            <button
-  onClick={startRecording}
-  className="flex items-center gap-2 bg-green-500 px-6 py-3 rounded-xl hover:bg-green-600 transition"
->
-  <FaMicrophone />
-  Start Recording
-</button>
-          ) : (
-            <button
-  onClick={stopRecording}
-  className="flex items-center gap-2 bg-red-500 px-6 py-3 rounded-xl hover:bg-red-600 transition"
->
-  <FaMicrophone />
-  Stop Recording
-</button>
-          )}
-        </div>
+        {/* LIVE RECORDING */}
+
+<div className="w-full max-w-4xl">
+
+  <button
+    onClick={
+      isLiveRecording
+        ? stopLiveRecording
+        : startLiveRecording
+    }
+    className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition ${
+      isLiveRecording
+        ? "bg-red-500 hover:bg-red-600"
+        : "bg-green-500 hover:bg-green-600"
+    }`}
+  >
+    <FaMicrophone />
+
+    {isLiveRecording
+      ? "Stop Recording"
+      : "Start Recording"}
+  </button>
+
+  <div className="mt-6 bg-gray-900/80 backdrop-blur-md border border-cyan-500/20 rounded-3xl p-6">
+
+    <h3 className="text-2xl font-bold mb-4 text-cyan-400">
+      Live Transcript
+    </h3>
+
+    <p className="text-gray-300 leading-8 min-h-[120px]">
+      {liveTranscript ||
+        "Listening... Speak into your microphone"}
+    </p>
+
+  </div>
+
+</div>
 
         {/* TRANSCRIBE */}
         <button
@@ -425,6 +454,8 @@ const handleLogout = () => {
     </p>
   </div>
 </div>
+
+
 
       {/* HISTORY */}
       <div className="mt-16">
