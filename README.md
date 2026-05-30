@@ -109,8 +109,7 @@ speech-to-text-app
 ### Clone Repository
 
 ```bash
-git clone https://github.com/your-username/voicescribe-ai.git
-cd voicescribe-ai
+git clone https://github.com/Pranav-Reddy29/speech-to-text-app.git
 ```
 
 ---
