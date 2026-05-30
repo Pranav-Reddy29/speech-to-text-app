@@ -107,5 +107,31 @@ router.delete("/:id", protect, async (req, res) => {
   }
 });
 
+router.post(
+  "/save-live",
+  protect,
+  async (req, res) => {
+    try {
+
+      const saved =
+        await Transcription.create({
+          user: req.user,
+          filename:
+            `Live-${Date.now()}.txt`,
+          audioPath: "live",
+          transcription:
+            req.body.transcript,
+        });
+
+      res.status(201).json(saved);
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

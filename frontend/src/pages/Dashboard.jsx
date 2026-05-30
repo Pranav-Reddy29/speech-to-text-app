@@ -6,14 +6,13 @@ import {
   useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import socket from "../socket";
 import {
   FaMicrophone,
   FaUpload,
   FaSearch,
   FaCopy,
-  FaDownload,
   FaTrash,
+  FaDownload,
   FaSignOutAlt,
 } from "react-icons/fa";
 
@@ -24,8 +23,10 @@ import toast from "react-hot-toast";
 function Dashboard() {
   const [audio, setAudio] = useState(null);
 
-  const [transcription, setTranscription] =
-    useState("");
+  const [, setTranscription] = useState("");
+
+  const [currentTranscript, setCurrentTranscript] =
+  useState("");
 
   const [history, setHistory] = useState([]);
 
@@ -39,7 +40,7 @@ function Dashboard() {
 const [isLiveRecording, setIsLiveRecording] =
   useState(false);
 
-const mediaRecorderRef = useRef(null);
+const recognitionRef = useRef(null);
 
   const token = localStorage.getItem("token");
 
@@ -62,29 +63,6 @@ const mediaRecorderRef = useRef(null);
   }, [token]);
 
   useEffect(() => {
-  socket.on("connect", () => {
-    console.log(
-      "Connected to Socket Server"
-    );
-  });
-
-  socket.on(
-    "transcript",
-    (transcript) => {
-      setLiveTranscript(
-        (prev) =>
-          prev + " " + transcript
-      );
-    }
-  );
-
-  return () => {
-    socket.off("connect");
-    socket.off("transcript");
-  };
-}, []);
-
-  useEffect(() => {
     // defer calling fetchHistory to avoid setting state synchronously inside an effect
     const id = setTimeout(() => {
       fetchHistory();
@@ -93,55 +71,93 @@ const mediaRecorderRef = useRef(null);
     return () => clearTimeout(id);
   }, [fetchHistory]);
 
-const startLiveRecording = async () => {
-  try {
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
+const startLiveRecording = () => {
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
-    const recorder = new MediaRecorder(stream);
+  if (!SpeechRecognition) {
+    toast.error(
+      "Speech Recognition is not supported in this browser"
+    );
+    return;
+  }
 
-    mediaRecorderRef.current = recorder;
+  const recognition = new SpeechRecognition();
 
-    recorder.ondataavailable = async (
-      event
-    ) => {
-      if (event.data.size > 0) {
-        const arrayBuffer =
-          await event.data.arrayBuffer();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
 
-        socket.emit(
-          "audio-stream",
-          arrayBuffer
-        );
-      }
-    };
-
-    recorder.start(250);
-
+  recognition.onstart = () => {
+    setIsLiveRecording(true);
     setLiveTranscript("");
 
-    setIsLiveRecording(true);
-
-    toast.success("Recording started");
-  } catch (error) {
-    console.log(error);
-
-    toast.error(
-      "Microphone access denied"
+    toast.success(
+      "Live transcription started"
     );
+  };
+
+  recognition.onresult = (event) => {
+  let transcript = "";
+
+  for (
+    let i = 0;
+    i < event.results.length;
+    i++
+  ) {
+    transcript +=
+      event.results[i][0].transcript +
+      " ";
+  }
+
+  setLiveTranscript(transcript);
+
+  setCurrentTranscript(transcript);
+};
+
+  recognition.onerror = (event) => {
+    console.log(
+      "Speech Recognition Error:",
+      event.error
+    );
+
+    if (event.error !== "aborted") {
+      toast.error(
+        "Speech recognition error"
+      );
+    }
+  };
+
+  recognition.onend = () => {
+  if (
+    recognitionRef.current &&
+    isLiveRecording
+  ) {
+    try {
+      recognition.start();
+    } catch {
+      // ignore restart errors
+    }
   }
 };
 
+  recognition.start();
+
+  recognitionRef.current = recognition;
+};
+
 const stopLiveRecording = () => {
-  if (mediaRecorderRef.current) {
-    mediaRecorderRef.current.stop();
+  if (recognitionRef.current) {
+    recognitionRef.current.onend = null;
+    recognitionRef.current.stop();
   }
 
   setIsLiveRecording(false);
 
-  toast.success("Recording stopped");
+  toast.success(
+    "Live transcription stopped"
+  );
 };
 
   // HANDLE UPLOAD
@@ -179,6 +195,10 @@ const stopLiveRecording = () => {
       );
 
       setTranscription(
+        transcribeRes.data.transcription
+      );
+
+      setCurrentTranscript(
         transcribeRes.data.transcription
       );
 
@@ -248,19 +268,47 @@ const stopLiveRecording = () => {
     toast.success("Download started");
   };
 
+const saveLiveTranscript = async () => {
+  try {
+    if (!liveTranscript.trim()) {
+      toast.error("No transcript available");
+      return;
+    }
+
+    await axios.post(
+      `${import.meta.env.VITE_API_URL}/api/transcribe/save-live`,
+      {
+        transcript: liveTranscript,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    toast.success("Live transcript saved");
+
+    setLiveTranscript("");
+    setCurrentTranscript("");
+
+    fetchHistory();
+  } catch (error) {
+    console.log(error);
+    toast.error("Save failed");
+  }
+};
+
   // SEARCH FILTER
   const filteredHistory = useMemo(() => {
-  return history.filter((item) => {
-    return (
-      item.transcription
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
+  const term = search.trim().toLowerCase();
 
-      item.filename
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
-  });
+  if (!term) return history;
+
+  return history.filter((item) =>
+    item.filename?.toLowerCase().includes(term) ||
+    item.transcription?.toLowerCase().includes(term)
+  );
 }, [history, search]);
 
 const navigate = useNavigate();
@@ -326,103 +374,268 @@ const handleLogout = () => {
   />
 </div>
 
-      {/* UPLOAD SECTION */}
-      <div className="flex flex-col items-center gap-6">
-        <label className="w-full max-w-2xl h-52 border-2 border-dashed border-blue-500 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-blue-500/10 transition">
-  <input
-    type="file"
-    accept="audio/*"
-    onChange={(e) =>
-      setAudio(e.target.files[0])
-    }
-    className="hidden"
-  />
+{search.trim() ? (
+  /* SEARCH MODE */
+  <div className="mt-10">
+    <h2 className="text-3xl font-bold text-cyan-400 mb-6">
+      Search Results ({filteredHistory.length})
+    </h2>
 
-  <FaUpload className="text-5xl mb-4 text-blue-400" />
+    <div className="space-y-6">
+      {filteredHistory.length > 0 ? (
+        filteredHistory.map((item) => (
+          <div
+            key={item._id}
+            className="bg-gray-900/70 border border-cyan-500/20 p-6 rounded-2xl"
+          >
+            <h3 className="text-xl font-bold mb-4">
+              {item.filename}
+            </h3>
 
-  <p className="text-2xl font-semibold">
-    Upload Audio File
-  </p>
+            {item.audioPath !== "live" && (
+              <audio controls className="w-full mb-4">
+                <source
+                  src={`${import.meta.env.VITE_API_URL}/${item.audioPath}`}
+                />
+              </audio>
+            )}
 
-  <p className="text-gray-400 mt-2">
-    MP3 • WAV • M4A
-  </p>
+            <p className="text-gray-300 mb-4">
+              {item.transcription}
+            </p>
 
-  {audio && (
-    <p className="mt-4 text-green-400">
-      {audio.name}
-    </p>
-  )}
-</label>
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  handleCopy(item.transcription)
+                }
+                className="bg-blue-500 px-4 py-2 rounded-xl"
+              >
+                Copy
+              </button>
 
-        {/* LIVE RECORDING */}
+              <button
+                onClick={() =>
+                  handleDownload(item.transcription)
+                }
+                className="bg-green-500 px-4 py-2 rounded-xl"
+              >
+                Download
+              </button>
 
-<div className="w-full max-w-4xl">
+              <button
+                onClick={() =>
+                  handleDelete(item._id)
+                }
+                className="bg-red-500 px-4 py-2 rounded-xl"
+              >
+                Delete
+              </button>
+            </div>
 
-  <button
-    onClick={
-      isLiveRecording
-        ? stopLiveRecording
-        : startLiveRecording
-    }
-    className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition ${
-      isLiveRecording
-        ? "bg-red-500 hover:bg-red-600"
-        : "bg-green-500 hover:bg-green-600"
-    }`}
-  >
-    <FaMicrophone />
+            <p className="text-sm text-gray-500 mt-4">
+              {new Date(
+                item.createdAt
+              ).toLocaleString()}
+            </p>
+          </div>
+        ))
+      ) : (
+        <div className="bg-gray-900 p-8 rounded-2xl text-center">
+          <p className="text-gray-400 text-xl">
+            No matching files found
+          </p>
+        </div>
+      )}
+    </div>
+  </div>
+) : (
+  <>
+  {/* MAIN SECTION */}
 
-    {isLiveRecording
-      ? "Stop Recording"
-      : "Start Recording"}
-  </button>
+<div className="grid lg:grid-cols-2 gap-8 mt-10">
 
-  <div className="mt-6 bg-gray-900/80 backdrop-blur-md border border-cyan-500/20 rounded-3xl p-6">
+  {/* LEFT PANEL */}
 
-    <h3 className="text-2xl font-bold mb-4 text-cyan-400">
-      Live Transcript
-    </h3>
+  <div className="space-y-6">
 
-    <p className="text-gray-300 leading-8 min-h-[120px]">
-      {liveTranscript ||
-        "Listening... Speak into your microphone"}
-    </p>
+    <label className="w-full h-72 border-2 border-dashed border-cyan-500 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/10 transition">
+
+      <input
+        type="file"
+        accept="audio/*"
+        hidden
+        onChange={(e) =>
+          setAudio(e.target.files[0])
+        }
+      />
+
+      <FaUpload className="text-6xl text-cyan-400 mb-4" />
+
+      <h2 className="text-2xl font-bold">
+        Upload Audio File
+      </h2>
+
+      <p className="text-gray-400 mt-2">
+        MP3 • WAV • M4A
+      </p>
+
+      {audio && (
+        <p className="mt-4 text-green-400">
+          {audio.name}
+        </p>
+      )}
+
+    </label>
+
+    <button
+      onClick={
+        isLiveRecording
+          ? stopLiveRecording
+          : startLiveRecording
+      }
+      className={`w-full py-4 rounded-2xl text-lg font-bold transition ${
+        isLiveRecording
+          ? "bg-red-500 hover:bg-red-600"
+          : "bg-green-500 hover:bg-green-600"
+      }`}
+    >
+      <FaMicrophone className="inline mr-2" />
+
+      {isLiveRecording
+        ? "Stop Recording"
+        : "Start Recording"}
+    </button>
+
+    {isLiveRecording && (
+      <div className="bg-gray-900/70 rounded-2xl p-6">
+
+        <div className="flex justify-center items-end gap-2 h-20">
+
+          <div className="w-2 bg-cyan-400 rounded animate-bounce h-8"></div>
+
+          <div
+            className="w-2 bg-cyan-400 rounded animate-bounce h-14"
+            style={{
+              animationDelay: "0.1s",
+            }}
+          ></div>
+
+          <div
+            className="w-2 bg-cyan-400 rounded animate-bounce h-10"
+            style={{
+              animationDelay: "0.2s",
+            }}
+          ></div>
+
+          <div
+            className="w-2 bg-cyan-400 rounded animate-bounce h-16"
+            style={{
+              animationDelay: "0.3s",
+            }}
+          ></div>
+
+          <div
+            className="w-2 bg-cyan-400 rounded animate-bounce h-8"
+            style={{
+              animationDelay: "0.4s",
+            }}
+          ></div>
+
+        </div>
+
+        <p className="text-center text-cyan-400 mt-4">
+          Listening...
+        </p>
+
+      </div>
+    )}
+
+    <div className="grid grid-cols-2 gap-4">
+
+      <button
+        onClick={handleUpload}
+        className="bg-gradient-to-r from-blue-500 to-cyan-500 py-4 rounded-2xl font-bold hover:scale-105 transition"
+      >
+        Upload & Transcribe
+      </button>
+
+      <button
+        onClick={saveLiveTranscript}
+        className="bg-cyan-500 py-4 rounded-2xl font-bold hover:bg-cyan-600 transition"
+      >
+        Save Transcript
+      </button>
+
+    </div>
+
+    {loading && (
+      <div className="text-center text-yellow-400 animate-pulse">
+        Transcribing Audio...
+      </div>
+    )}
+
+  </div>
+
+  {/* RIGHT PANEL */}
+
+  <div className="bg-gray-900/70 backdrop-blur-md border border-cyan-500/20 rounded-3xl p-8">
+
+    <div className="flex justify-between items-center mb-6">
+
+      <h2 className="text-3xl font-bold text-cyan-400">
+        Transcript
+      </h2>
+
+      <div className="flex gap-2">
+
+        <button
+          onClick={() =>
+            handleCopy(
+              currentTranscript
+            )
+          }
+          className="bg-blue-500 px-4 py-2 rounded-xl"
+        >
+          <FaCopy />
+        </button>
+
+        <button
+          onClick={() =>
+            handleDownload(
+              currentTranscript
+            )
+          }
+          className="bg-green-500 px-4 py-2 rounded-xl"
+        >
+          <FaDownload />
+        </button>
+
+      </div>
+
+    </div>
+
+    <div className="min-h-[500px] max-h-[500px] overflow-y-auto">
+
+      <p className="text-gray-300 leading-8 whitespace-pre-wrap">
+
+        {currentTranscript ||
+
+          "Upload an audio file or start recording to view transcription here..."}
+
+      </p>
+
+    </div>
 
   </div>
 
 </div>
 
-        {/* TRANSCRIBE */}
-        <button
-  onClick={handleUpload}
-  className="bg-gradient-to-r from-blue-500 to-cyan-500 px-10 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition"
->
-  Upload & Transcribe
-</button>
+{/* STATS */}
 
-        {/* LOADING */}
-        {loading && (
-          <p className="text-yellow-400 text-xl animate-pulse">
-            Transcribing Audio...
-          </p>
-        )}
+<div className="grid md:grid-cols-3 gap-6 mt-12 mb-10">
 
-        {/* LATEST */}
-        {transcription && (
-          <div className="bg-gray-900/80 p-6 rounded-2xl shadow-xl w-full max-w-3xl">
-            <h2 className="text-2xl font-bold mb-4">
-              Latest Transcription
-            </h2>
-
-            <p className="text-lg leading-8 text-gray-300">
-              {transcription}
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="grid md:grid-cols-3 gap-6 mt-16 mb-10">
-  <div className="bg-gray-900/70 backdrop-blur-md p-6 rounded-2xl">
+  <div className="bg-gray-900/70 p-6 rounded-2xl">
     <h3 className="text-gray-400">
       Total Files
     </h3>
@@ -432,19 +645,19 @@ const handleLogout = () => {
     </p>
   </div>
 
-  <div className="bg-gray-900/70 backdrop-blur-md p-6 rounded-2xl">
+  <div className="bg-gray-900/70 p-6 rounded-2xl">
     <h3 className="text-gray-400">
-      Latest Result
+      Current Transcript
     </h3>
 
     <p className="text-2xl font-bold">
-      {transcription
-        ? "Available"
-        : "None"}
+      {currentTranscript
+        ? "Ready"
+        : "Empty"}
     </p>
   </div>
 
-  <div className="bg-gray-900/70 backdrop-blur-md p-6 rounded-2xl">
+  <div className="bg-gray-900/70 p-6 rounded-2xl">
     <h3 className="text-gray-400">
       Search Results
     </h3>
@@ -453,90 +666,87 @@ const handleLogout = () => {
       {filteredHistory.length}
     </p>
   </div>
+
 </div>
 
+{/* HISTORY */}
+<div className="mt-16">
+  <h2 className="text-4xl font-bold mb-8">
+    History
+  </h2>
 
+  <div className="space-y-6">
+    {filteredHistory.length > 0 ? (
+      filteredHistory.map((item) => (
+        <div
+          key={item._id}
+          className="bg-gray-900/70 p-6 rounded-2xl"
+        >
+          <h3 className="text-xl font-bold mb-4">
+            {item.filename}
+          </h3>
 
-      {/* HISTORY */}
-      <div className="mt-16">
-        <h2 className="text-4xl font-bold mb-8">
-          History
-        </h2>
-
-        <div className="bg-gray-900/70 backdrop-blur-md p-6 rounded-3xl shadow-2xl border border-gray-800 hover:border-blue-500 transition">
-          {filteredHistory.length > 0 ? (
-            filteredHistory.map((item) => (
-              <div
-                key={item._id}
-                className="bg-gray-900/80 p-6 rounded-2xl shadow-xl hover:scale-[1.02] transition duration-300"
-              >
-                <h3 className="text-xl font-bold mb-3">
-                  {item.filename}
-                </h3>
-
-                <audio
-                  controls
-                  className="w-full mb-4"
-                >
-                  <source
-                    src={`${import.meta.env.VITE_API_URL}/${item.audioPath}`}
-                  />
-                </audio>
-
-                <p className="text-gray-300 leading-7 mb-4">
-                  {item.transcription}
-                </p>
-
-                {/* ACTION BUTTONS */}
-                <div className="flex flex-wrap gap-3">
-                  <button
-  onClick={() =>
-    handleCopy(item.transcription)
-  }
-  className="flex items-center gap-2 bg-blue-500 px-4 py-2 rounded-xl"
->
-  <FaCopy />
-  Copy
-</button>
-
-                  <button
-  onClick={() =>
-    handleDownload(item.transcription)
-  }
-  className="flex items-center gap-2 bg-green-500 px-4 py-2 rounded-xl"
->
-  <FaDownload />
-  Download
-</button>
-
-                  <button
-  onClick={() =>
-    handleDelete(item._id)
-  }
-  className="flex items-center gap-2 bg-red-500 px-4 py-2 rounded-xl"
->
-  <FaTrash />
-  Delete
-</button>
-                </div>
-
-                <p className="text-sm text-gray-500 mt-4">
-                  {new Date(
-                    item.createdAt
-                  ).toLocaleString()}
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="bg-gray-900 p-8 rounded-lg text-center">
-              <p className="text-gray-400 text-xl">
-                No transcription history
-                found 🎙️
-              </p>
-            </div>
+          {item.audioPath !== "live" && (
+            <audio
+              controls
+              className="w-full mb-4"
+            >
+              <source
+                src={`${import.meta.env.VITE_API_URL}/${item.audioPath}`}
+              />
+            </audio>
           )}
+
+          <p className="text-gray-300 mb-4">
+            {item.transcription}
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() =>
+                handleCopy(item.transcription)
+              }
+              className="bg-blue-500 px-4 py-2 rounded-xl"
+            >
+              Copy
+            </button>
+
+            <button
+              onClick={() =>
+                handleDownload(item.transcription)
+              }
+              className="bg-green-500 px-4 py-2 rounded-xl"
+            >
+              Download
+            </button>
+
+            <button
+              onClick={() =>
+                handleDelete(item._id)
+              }
+              className="flex items-center gap-2 bg-red-500 px-4 py-2 rounded-xl"
+            >
+              <FaTrash />
+              Delete
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-500 mt-4">
+            {new Date(
+              item.createdAt
+            ).toLocaleString()}
+          </p>
         </div>
+      ))
+    ) : (
+      <div className="bg-gray-900 p-8 rounded-xl text-center">
+        No transcription history found
       </div>
+    )}
+  </div>
+</div>
+</>
+)}
     </div>
   );
 }
