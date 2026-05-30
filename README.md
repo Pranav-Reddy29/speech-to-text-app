@@ -285,15 +285,19 @@ DELETE /api/transcribe/:id
 ## Screenshots
 
 ### Login Page
+
 ![Login Page](./README-assets/login.png)
 
 ### Dashboard
+
 ![Dashboard](./README-assets/dashboard.png)
 
 ### Live Recording
+
 ![Live Recording](./README-assets/liverecording.png)
 
 ### History Section
+
 ![History](./README-assets/history.png)
 
 ---
