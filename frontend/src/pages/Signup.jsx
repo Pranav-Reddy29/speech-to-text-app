@@ -1,9 +1,15 @@
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { toast } from "react-toastify";
+import AuthLayout from "../components/AuthLayout";
 
 function Signup() {
   const navigate = useNavigate();
+
+  const [showPassword, setShowPassword] =
+    useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,62 +33,116 @@ function Signup() {
         formData
       );
 
-      alert("Signup Successful");
+      toast.success(
+        "Account created successfully 🚀"
+      );
 
-      navigate("/login");
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
+
     } catch (error) {
-      console.log(error);
 
-      alert("Signup Failed");
+      toast.error(
+        error.response?.data?.message ||
+        "Email already exists"
+      );
     }
   };
 
   return (
-    <div className="h-screen bg-black text-white flex items-center justify-center">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-gray-900 p-8 rounded-lg w-96 flex flex-col gap-4"
-      >
-        <h1 className="text-3xl font-bold text-center">
-          Signup
-        </h1>
+    <AuthLayout>
+      <div className="w-full max-w-md">
 
-        <input
-          type="text"
-          name="name"
-          placeholder="Name"
-          onChange={handleChange}
-          className="p-3 rounded bg-gray-800"
-        />
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
 
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          onChange={handleChange}
-          className="p-3 rounded bg-gray-800"
-        />
+          <span className="inline-block px-4 py-2 bg-purple-500/20 text-purple-300 rounded-full text-sm mb-4">
+            Join EchoScript
+          </span>
 
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          onChange={handleChange}
-          className="p-3 rounded bg-gray-800"
-        />
+          <h2 className="text-4xl font-bold mb-2 text-white">
+            Create Workspace
+          </h2>
 
-        <button className="bg-blue-500 p-3 rounded hover:bg-blue-600">
-          Signup
-        </button>
+          <p className="text-gray-400 mb-8">
+            Start building your personal transcription library.
+          </p>
 
-        <p className="text-center">
-          Already have an account?{" "}
-          <Link to="/login" className="text-blue-400">
-            Login
-          </Link>
-        </p>
-      </form>
-    </div>
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
+
+            <input
+              type="text"
+              name="name"
+              placeholder="Full Name"
+              onChange={handleChange}
+              required
+              className="w-full p-4 rounded-2xl bg-[#10182d] border border-white/10 text-white outline-none focus:border-purple-400"
+            />
+
+            <input
+              type="email"
+              name="email"
+              placeholder="Email Address"
+              onChange={handleChange}
+              required
+              className="w-full p-4 rounded-2xl bg-[#10182d] border border-white/10 text-white outline-none focus:border-purple-400"
+            />
+
+            <div className="relative">
+
+              <input
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                name="password"
+                placeholder="Create Password"
+                onChange={handleChange}
+                required
+                className="w-full p-4 rounded-2xl bg-[#10182d] border border-white/10 text-white outline-none focus:border-purple-400"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+                className="absolute right-5 top-5 text-gray-400"
+              >
+                {showPassword
+                  ? <FaEyeSlash />
+                  : <FaEye />}
+              </button>
+
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-600 py-4 rounded-2xl font-bold hover:scale-105 transition"
+            >
+              Launch EchoScript
+            </button>
+
+          </form>
+
+          <p className="text-center text-gray-400 mt-8">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-purple-400"
+            >
+              Login
+            </Link>
+          </p>
+
+        </div>
+
+      </div>
+    </AuthLayout>
   );
 }
 

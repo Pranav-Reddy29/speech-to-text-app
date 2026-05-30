@@ -4,7 +4,8 @@ import {
   useMemo,
   useState,
 } from "react";
-
+import { useNavigate } from "react-router-dom";
+import socket from "../socket";
 import {
   FaMicrophone,
   FaUpload,
@@ -56,6 +57,18 @@ function Dashboard() {
       console.log(error);
     }
   }, [token]);
+
+  useEffect(() => {
+  socket.on("connect", () => {
+    console.log(
+      "Connected to Socket Server"
+    );
+  });
+
+  return () => {
+    socket.off("connect");
+  };
+}, []);
 
   useEffect(() => {
     // defer calling fetchHistory to avoid setting state synchronously inside an effect
@@ -238,26 +251,41 @@ function Dashboard() {
   });
 }, [history, search]);
 
+const navigate = useNavigate();
+
+const handleLogout = () => {
+  localStorage.removeItem("token");
+
+  toast.success("Logged out successfully 👋");
+
+  setTimeout(() => {
+    navigate("/login");
+  }, 1000);
+};
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white p-6">
       {/* LOGOUT */}
       <div className="flex justify-between items-center mb-10">
-  <div>
-    <h2 className="text-xl text-gray-400">
-      Welcome Back 👋
-    </h2>
-  </div>
+        <div className="flex items-center gap-2 mb-8">
+          <img
+            src="/logo.png"
+            alt="logo"
+            className="w-10 h-10 rounded-xl"
+          />
+
+          <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            VoiceScribe AI
+          </h1>
+        </div>
 
   <button
-    onClick={() => {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-    }}
-    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-5 py-3 rounded-xl transition"
-  >
-    <FaSignOutAlt />
-    Logout
-  </button>
+  onClick={handleLogout}
+  className="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-5 py-3 rounded-xl transition"
+>
+  <FaSignOutAlt />
+  Logout
+</button>
 </div>
 
       {/* TITLE */}
