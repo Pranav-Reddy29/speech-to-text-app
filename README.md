@@ -332,7 +332,7 @@ Through this project, the following concepts were implemented:
 
 ## Author
 
-**Baddam Pranav kumar Reddy**
+## Baddam Pranav kumar Reddy
 
 VoiceScribe AI – Speech-to-Text Platform
 
