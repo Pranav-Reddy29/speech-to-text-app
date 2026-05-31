@@ -39,6 +39,8 @@ function Dashboard() {
 
 const [isLiveRecording, setIsLiveRecording] =
   useState(false);
+  
+const recordingRef = useRef(false);
 
 const recognitionRef = useRef(null);
 
@@ -90,6 +92,7 @@ const startLiveRecording = () => {
   recognition.lang = "en-US";
 
   recognition.onstart = () => {
+    recordingRef.current = true;
     setIsLiveRecording(true);
     setLiveTranscript("");
 
@@ -130,16 +133,29 @@ const startLiveRecording = () => {
   };
 
   recognition.onend = () => {
-  if (
-    recognitionRef.current &&
-    isLiveRecording
-  ) {
+
+  if (!recordingRef.current) return;
+
+  setTimeout(() => {
+
     try {
       recognition.start();
-    } catch {
-      // ignore restart errors
+
+      console.log(
+        "Recognition restarted"
+      );
+
+    } catch (err) {
+
+      console.log(
+        "Restart failed",
+        err
+      );
+
     }
-  }
+
+  }, 300);
+
 };
 
   recognition.start();
@@ -148,6 +164,8 @@ const startLiveRecording = () => {
 };
 
 const stopLiveRecording = () => {
+  recordingRef.current = false;
+
   if (recognitionRef.current) {
     recognitionRef.current.onend = null;
     recognitionRef.current.stop();
