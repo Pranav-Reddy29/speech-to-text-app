@@ -342,9 +342,9 @@ const handleLogout = () => {
 };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white p-4 md:p-6">
       {/* LOGOUT */}
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-10">
         <div className="flex items-center gap-2 mb-8">
           <img
             src="/logo.png"
@@ -368,7 +368,7 @@ const handleLogout = () => {
 
       {/* TITLE */}
       <div className="text-center mb-12">
-        <h1 className="text-6xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-6xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
           AI Speech To Text
         </h1>
 
@@ -471,13 +471,13 @@ const handleLogout = () => {
   <>
   {/* MAIN SECTION */}
 
-<div className="grid lg:grid-cols-2 gap-8 mt-10">
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
 
   {/* LEFT PANEL */}
 
   <div className="space-y-6">
 
-    <label className="w-full h-72 border-2 border-dashed border-cyan-500 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/10 transition">
+    <label className="w-full h-48 md:h-72 border-2 border-dashed border-cyan-500 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/10 transition">
 
       <input
         type="file"
@@ -569,7 +569,7 @@ const handleLogout = () => {
       </div>
     )}
 
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
       <button
         onClick={handleUpload}
@@ -633,7 +633,7 @@ const handleLogout = () => {
 
     </div>
 
-    <div className="min-h-[500px] max-h-[500px] overflow-y-auto">
+    <div className="min-h-[300px] max-h-[400px] md:min-h-[500px] md:max-h-[500px] overflow-y-auto">
 
       <p className="text-gray-300 leading-8 whitespace-pre-wrap">
 
@@ -651,7 +651,7 @@ const handleLogout = () => {
 
 {/* STATS */}
 
-<div className="grid md:grid-cols-3 gap-6 mt-12 mb-10">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-12 mb-10">
 
   <div className="bg-gray-900/70 p-6 rounded-2xl">
     <h3 className="text-gray-400">
@@ -719,7 +719,7 @@ const handleLogout = () => {
             {item.transcription}
           </p>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={() =>
                 handleCopy(item.transcription)
